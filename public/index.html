@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ASP Messina - Login</title>
-    <link rel="stylesheet" href="/css/style.css">
+    <link rel="stylesheet" href="css/style.css">
 </head>
 <body class="login-body">
     <div class="login-container">
@@ -30,6 +30,11 @@
             </form>
         </div>
     </div>
-    <script src="/js/login.js"></script>
+    <script>
+        // Base path per supportare deployment in sottodirectory
+        var p = window.location.pathname; if (!p.endsWith('/')) p = p.substring(0, p.lastIndexOf('/') + 1);
+        window.APP_BASE = p;
+    </script>
+    <script src="js/login.js"></script>
 </body>
 </html>

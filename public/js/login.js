@@ -10,14 +10,14 @@ document.getElementById('loginForm').addEventListener('submit', async (e) => {
     btn.textContent = 'Accesso in corso...';
 
     try {
-        const res = await fetch('/api/login', {
+        const res = await fetch(APP_BASE + 'api/login', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ username, password })
         });
         const data = await res.json();
         if (res.ok && data.ok) {
-            window.location.href = '/app.html';
+            window.location.href = APP_BASE + 'app.html';
         } else {
             errorEl.textContent = data.error || 'Errore durante il login';
             errorEl.style.display = 'block';

@@ -8,7 +8,7 @@ function startWsPolling() {
 
 async function updateWsStatus() {
     try {
-        const res = await fetch('/api/ws/status');
+        const res = await fetch(APP_BASE + 'api/ws/status');
         const data = await res.json();
         const badge = document.getElementById('wsStatus');
         if (badge) {
@@ -22,7 +22,7 @@ async function updateWsStatus() {
 
 async function sendWsCommand(command, data) {
     try {
-        const res = await fetch('/api/ws/command', {
+        const res = await fetch(APP_BASE + 'api/ws/command', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ command, data: data || {} })

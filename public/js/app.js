@@ -27,22 +27,22 @@ function showAlert(message, type = 'info', duration = 3000) {
 // Auth check
 async function checkAuth() {
     try {
-        const res = await fetch('/api/auth/status');
+        const res = await fetch(APP_BASE + 'api/auth/status');
         const data = await res.json();
         if (!data.authenticated) {
-            window.location.href = '/';
+            window.location.href = APP_BASE;
             return;
         }
         document.getElementById('userInfo').textContent = data.username;
     } catch {
-        window.location.href = '/';
+        window.location.href = APP_BASE;
     }
 }
 
 // Logout
 document.getElementById('logoutBtn').addEventListener('click', async () => {
-    await fetch('/api/logout', { method: 'POST' });
-    window.location.href = '/';
+    await fetch(APP_BASE + 'api/logout', { method: 'POST' });
+    window.location.href = APP_BASE;
 });
 
 // Search type tabs
@@ -93,14 +93,14 @@ document.getElementById('searchForm').addEventListener('submit', async (e) => {
 
     showLoading(true);
     try {
-        const res = await fetch('/api/anagrafica/ricerca', {
+        const res = await fetch(APP_BASE + 'api/anagrafica/ricerca', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(params)
         });
         if (res.status === 401) {
             showAlert('Sessione scaduta', 'error');
-            setTimeout(() => window.location.href = '/', 1500);
+            setTimeout(() => { window.location.href = APP_BASE; }, 1500);
             return;
         }
         const body = await res.json();
