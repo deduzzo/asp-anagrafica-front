@@ -1,11 +1,12 @@
-// Socket.io - connessione tramite HTTP polling + upgrade WS automatico
+// Socket.io - connessione tramite HTTP long-polling (no WebSocket upgrade)
 let socket = null;
 
 function connectWs() {
     if (socket && socket.connected) return;
 
     socket = io({
-        path: window.APP_BASE + 'socket.io'
+        path: window.APP_BASE + 'socket.io',
+        transports: ['polling']
     });
 
     socket.on('connect', () => updateWsBadge(true));

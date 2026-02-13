@@ -12,7 +12,8 @@ const server = createServer(app);
 
 /* ======================== Socket.io ======================== */
 const io = new Server(server, {
-    cors: { origin: '*' }
+    cors: { origin: '*' },
+    transports: ['polling']
 });
 
 io.on('connection', (socket) => {
