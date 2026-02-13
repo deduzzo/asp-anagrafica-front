@@ -1,40 +1,30 @@
 const express = require('express');
-const http = require('http');
-const { WebSocketServer } = require('ws');
+const { createServer } = require('http');
+const { Server } = require('socket.io');
 
 const PORT = parseInt(process.env.PORT || '3000');
-const BASE_PATH = process.env.BASE_PATH || '/apps/asp-anagrafica-front/';
+const BASE_PATH = process.env.BASE_PATH || '/apps/asp-anagrafica-front';
 
 const app = express();
 app.use(express.static('public'));
 
-const server = http.createServer(app);
+const server = createServer(app);
 
-/* ======================== WebSocket ======================== */
-const wss = new WebSocketServer({ server });
-const clients = new Set();
+/* ======================== Socket.io ======================== */
+const io = new Server(server, {
+    cors: { origin: '*' }
+});
 
-wss.on('connection', (ws) => {
-    clients.add(ws);
-    console.log(`Client WS connesso. Totale: ${clients.size}`);
+io.on('connection', (socket) => {
+    console.log(`Client connesso (${socket.id}). Totale: ${io.engine.clientsCount}`);
 
-    ws.on('message', (data) => {
-        const msg = data.toString();
-        clients.forEach((client) => {
-            if (client !== ws && client.readyState === 1) {
-                try { client.send(msg); } catch {}
-            }
-        });
+    socket.on('message', (data) => {
+        // Broadcast a tutti gli altri client
+        socket.broadcast.emit('message', data);
     });
 
-    ws.on('close', () => {
-        clients.delete(ws);
-        console.log(`Client WS disconnesso. Totale: ${clients.size}`);
-    });
-
-    ws.on('error', (err) => {
-        console.error('WS error:', err.message);
-        clients.delete(ws);
+    socket.on('disconnect', () => {
+        console.log(`Client disconnesso (${socket.id}). Totale: ${io.engine.clientsCount}`);
     });
 });
 

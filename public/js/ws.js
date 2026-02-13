@@ -1,21 +1,22 @@
-// WebSocket - connessione tramite reverse proxy sullo stesso path dell'app
-let wsConnection = null;
-
-const WS_PROTOCOL = location.protocol === 'https:' ? 'wss:' : 'ws:';
-const WS_URL = WS_PROTOCOL + '//' + location.host + window.APP_BASE;
+// Socket.io - connessione tramite HTTP polling + upgrade WS automatico
+let socket = null;
 
 function connectWs() {
-    try {
-        if (wsConnection && (wsConnection.readyState === WebSocket.OPEN || wsConnection.readyState === WebSocket.CONNECTING)) return;
+    if (socket && socket.connected) return;
 
-        wsConnection = new WebSocket(WS_URL);
+    socket = io({
+        path: window.APP_BASE + 'socket.io'
+    });
 
-        wsConnection.onopen = () => updateWsBadge(true);
-        wsConnection.onclose = () => { wsConnection = null; updateWsBadge(false); };
-        wsConnection.onerror = () => { wsConnection = null; updateWsBadge(false); };
-    } catch {
-        updateWsBadge(false);
-    }
+    socket.on('connect', () => updateWsBadge(true));
+    socket.on('disconnect', () => updateWsBadge(false));
+
+    socket.on('message', (data) => {
+        // Gestione messaggi in arrivo dagli altri client
+        if (data && data.command) {
+            console.log('Comando ricevuto:', data.command, data.data);
+        }
+    });
 }
 
 function updateWsBadge(connected) {
@@ -27,12 +28,12 @@ function updateWsBadge(connected) {
 }
 
 function sendWsCommand(command, data) {
-    if (!wsConnection || wsConnection.readyState !== WebSocket.OPEN) {
+    if (!socket || !socket.connected) {
         showAlert('WebSocket non connesso', 'warning');
         return;
     }
     try {
-        wsConnection.send(JSON.stringify({ command, data: data || {} }));
+        socket.emit('message', { command, data: data || {} });
         showAlert(`Comando "${command}" inviato`, 'success');
     } catch {
         showAlert('Errore nell\'invio del comando', 'error');
@@ -41,9 +42,6 @@ function sendWsCommand(command, data) {
 
 document.addEventListener('DOMContentLoaded', () => {
     connectWs();
-    setInterval(() => {
-        if (!wsConnection || wsConnection.readyState !== WebSocket.OPEN) connectWs();
-    }, 5000);
 
     document.querySelectorAll('[data-cmd]').forEach(btn => {
         btn.addEventListener('click', () => {
