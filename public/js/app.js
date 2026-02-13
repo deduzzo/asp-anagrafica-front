@@ -2,7 +2,8 @@
 window._selectedAssistito = null;
 let currentSearchType = 'cf';
 
-// Utility: formatta data (gestisce sia stringhe che Unix timestamps)
+function getToken() { return sessionStorage.getItem('asp_token'); }
+
 function formatDate(val) {
     if (!val && val !== 0) return '';
     if (typeof val === 'string') return val;
@@ -11,7 +12,6 @@ function formatDate(val) {
     return d.toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
 
-// Alert system
 function showAlert(message, type = 'info', duration = 3000) {
     const container = document.getElementById('alertContainer');
     const el = document.createElement('div');
@@ -19,33 +19,20 @@ function showAlert(message, type = 'info', duration = 3000) {
     el.innerHTML = `<span>${message}</span><button class="alert-close">&times;</button>`;
     container.appendChild(el);
     el.querySelector('.alert-close').addEventListener('click', () => el.remove());
-    if (duration > 0) {
-        setTimeout(() => { if (el.parentNode) el.remove(); }, duration);
-    }
+    if (duration > 0) setTimeout(() => { if (el.parentNode) el.remove(); }, duration);
 }
 
-// Auth check
-async function checkAuth() {
-    try {
-        const res = await fetch(APP_BASE + 'api/auth/status');
-        const data = await res.json();
-        if (!data.authenticated) {
-            window.location.href = APP_BASE;
-            return;
-        }
-        document.getElementById('userInfo').textContent = data.username;
-    } catch {
-        window.location.href = APP_BASE;
-    }
+function checkAuth() {
+    if (!getToken()) { window.location.href = APP_BASE; return; }
+    document.getElementById('userInfo').textContent = sessionStorage.getItem('asp_username') || '';
 }
 
-// Logout
-document.getElementById('logoutBtn').addEventListener('click', async () => {
-    await fetch(APP_BASE + 'api/logout', { method: 'POST' });
+document.getElementById('logoutBtn').addEventListener('click', () => {
+    sessionStorage.removeItem('asp_token');
+    sessionStorage.removeItem('asp_username');
     window.location.href = APP_BASE;
 });
 
-// Search type tabs
 document.querySelectorAll('.tab-btn').forEach(btn => {
     btn.addEventListener('click', () => {
         document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
@@ -56,7 +43,6 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     });
 });
 
-// Search
 document.getElementById('searchForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     const params = {};
@@ -69,16 +55,11 @@ document.getElementById('searchForm').addEventListener('submit', async (e) => {
         const cognome = document.getElementById('cognome').value.trim();
         const nome = document.getElementById('nome').value.trim();
         const dn = document.getElementById('dataNascita').value;
-
         let validParams = 0;
         if (cognome && cognome.length >= 3) validParams++;
         if (nome && nome.length >= 3) validParams++;
         if (dn && dn.length >= 4) validParams++;
-
-        if (validParams < 2) {
-            showAlert('Inserire almeno 2 parametri tra nome (min 3 car.), cognome (min 3 car.) e data di nascita', 'warning');
-            return;
-        }
+        if (validParams < 2) { showAlert('Inserire almeno 2 parametri tra nome (min 3 car.), cognome (min 3 car.) e data di nascita', 'warning'); return; }
         if (cognome) params.cognome = cognome;
         if (nome) params.nome = nome;
         if (dn) params.dataNascita = dn;
@@ -92,18 +73,24 @@ document.getElementById('searchForm').addEventListener('submit', async (e) => {
 
     showLoading(true);
     try {
-        const res = await fetch(APP_BASE + 'api/anagrafica/ricerca', {
+        const token = getToken();
+        if (!token) { showAlert('Sessione scaduta', 'error'); setTimeout(() => { window.location.href = APP_BASE; }, 1500); return; }
+
+        const qs = new URLSearchParams();
+        for (const [k, v] of Object.entries(params)) { if (v !== undefined && v !== null && v !== '') qs.append(k, v); }
+
+        const res = await fetch('/api/v1/anagrafica/ricerca?' + qs.toString(), {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(params)
+            headers: { 'Authorization': 'Bearer ' + token }
         });
+
         if (res.status === 401) {
-            showAlert('Sessione scaduta', 'error');
+            showAlert('Sessione scaduta, effettuare nuovamente il login', 'error');
+            sessionStorage.removeItem('asp_token');
             setTimeout(() => { window.location.href = APP_BASE; }, 1500);
             return;
         }
-        const body = await res.json();
-        renderResults(body);
+        renderResults(await res.json());
     } catch (err) {
         showAlert('Errore nella ricerca', 'error');
     } finally {
@@ -111,39 +98,24 @@ document.getElementById('searchForm').addEventListener('submit', async (e) => {
     }
 });
 
-// Render results
 function renderResults(body) {
     const section = document.getElementById('resultsSection');
     const tbody = document.getElementById('resultsBody');
     const count = document.getElementById('resultsCount');
 
-    if (body.ok === false && body.err) {
-        showAlert(body.err.msg || 'Errore nella ricerca', 'error');
-        section.style.display = 'none';
-        return;
-    }
+    if (body.ok === false && body.err) { showAlert(body.err.msg || 'Errore nella ricerca', 'error'); section.style.display = 'none'; return; }
 
     let items = [];
     const data = body.data !== undefined ? body.data : body;
-
-    if (Array.isArray(data)) {
-        items = data;
-    } else if (data && Array.isArray(data.assistiti)) {
-        items = data.assistiti;
-    } else if (data && Array.isArray(data.risultati)) {
-        items = data.risultati;
-    } else if (data && typeof data === 'object' && (data.cf || data.codiceFiscale)) {
-        items = [data];
-    }
+    if (Array.isArray(data)) items = data;
+    else if (data && Array.isArray(data.assistiti)) items = data.assistiti;
+    else if (data && Array.isArray(data.risultati)) items = data.risultati;
+    else if (data && typeof data === 'object' && (data.cf || data.codiceFiscale)) items = [data];
 
     count.textContent = items.length;
     tbody.innerHTML = '';
 
-    if (items.length === 0) {
-        showAlert('Nessun risultato trovato', 'info');
-        section.style.display = 'none';
-        return;
-    }
+    if (items.length === 0) { showAlert('Nessun risultato trovato', 'info'); section.style.display = 'none'; return; }
 
     items.forEach((item) => {
         const isDeceased = !!item.dataDecesso;
@@ -155,99 +127,57 @@ function renderResults(body) {
             <td>${item.nome || ''}</td>
             <td>${formatDate(item.dataNascita)}</td>
             <td>${item.comuneResidenza || ''}</td>
-            <td>${isDeceased ? '<span class="badge badge-danger">Deceduto</span>' : '<span class="badge badge-success">In vita</span>'}</td>
-        `;
+            <td>${isDeceased ? '<span class="badge badge-danger">Deceduto</span>' : '<span class="badge badge-success">In vita</span>'}</td>`;
         tr.addEventListener('click', () => showDetail(item));
         tbody.appendChild(tr);
     });
 
     section.style.display = '';
     document.getElementById('detailSection').style.display = 'none';
-
-    if (items.length === 1) {
-        showDetail(items[0]);
-    }
+    if (items.length === 1) showDetail(items[0]);
 }
 
-// Show detail
 function showDetail(item) {
     window._selectedAssistito = item;
     const section = document.getElementById('detailSection');
-
     const isDeceased = !!item.dataDecesso;
-    if (isDeceased) {
-        showAlert('Attenzione: paziente deceduto', 'warning', 5000);
-    }
+    if (isDeceased) showAlert('Attenzione: paziente deceduto', 'warning', 5000);
 
-    // Calcola eta
     let eta = '';
     if (item.dataNascita) {
         let nascita;
-        if (typeof item.dataNascita === 'number') {
-            nascita = new Date(item.dataNascita * 1000);
-        } else if (typeof item.dataNascita === 'string' && item.dataNascita.includes('/')) {
-            const parts = item.dataNascita.split('/');
-            nascita = new Date(parts[2], parts[1] - 1, parts[0]);
-        } else {
-            nascita = new Date(item.dataNascita);
-        }
-
+        if (typeof item.dataNascita === 'number') nascita = new Date(item.dataNascita * 1000);
+        else if (typeof item.dataNascita === 'string' && item.dataNascita.includes('/')) { const p = item.dataNascita.split('/'); nascita = new Date(p[2], p[1]-1, p[0]); }
+        else nascita = new Date(item.dataNascita);
         let ref = new Date();
         if (item.dataDecesso) {
-            if (typeof item.dataDecesso === 'number') {
-                ref = new Date(item.dataDecesso * 1000);
-            } else if (typeof item.dataDecesso === 'string' && item.dataDecesso.includes('/')) {
-                const parts = item.dataDecesso.split('/');
-                ref = new Date(parts[2], parts[1] - 1, parts[0]);
-            }
+            if (typeof item.dataDecesso === 'number') ref = new Date(item.dataDecesso * 1000);
+            else if (typeof item.dataDecesso === 'string' && item.dataDecesso.includes('/')) { const p = item.dataDecesso.split('/'); ref = new Date(p[2], p[1]-1, p[0]); }
         }
-
-        if (!isNaN(nascita.getTime())) {
-            eta = Math.floor((ref - nascita) / (365.25 * 24 * 60 * 60 * 1000));
-        }
+        if (!isNaN(nascita.getTime())) eta = Math.floor((ref - nascita) / (365.25*24*60*60*1000));
     }
 
     renderDetailGrid('detailAnagrafica', [
-        ['Codice Fiscale', item.cf || item.codiceFiscale],
-        ['CF Normalizzato', item.cfNormalizzato],
-        ['Cognome', item.cognome],
-        ['Nome', item.nome],
-        ['Sesso', item.sesso],
-        ['Data Nascita', formatDate(item.dataNascita)],
-        ['Comune Nascita', item.comuneNascita],
-        ['Cod. ISTAT Nascita', item.codIstatComuneNascita],
-        ['Provincia Nascita', item.provinciaNascita],
-        ['Eta', eta]
+        ['Codice Fiscale', item.cf || item.codiceFiscale], ['CF Normalizzato', item.cfNormalizzato],
+        ['Cognome', item.cognome], ['Nome', item.nome], ['Sesso', item.sesso],
+        ['Data Nascita', formatDate(item.dataNascita)], ['Comune Nascita', item.comuneNascita],
+        ['Cod. ISTAT Nascita', item.codIstatComuneNascita], ['Provincia Nascita', item.provinciaNascita], ['Eta', eta]
     ]);
-
     renderDetailGrid('detailResidenza', [
-        ['Indirizzo', item.indirizzoResidenza],
-        ['CAP', item.capResidenza],
-        ['Comune', item.comuneResidenza],
-        ['Cod. ISTAT Comune', item.codIstatComuneResidenza]
+        ['Indirizzo', item.indirizzoResidenza], ['CAP', item.capResidenza],
+        ['Comune', item.comuneResidenza], ['Cod. ISTAT Comune', item.codIstatComuneResidenza]
     ]);
-
     renderDetailGrid('detailSanitari', [
-        ['ASP', item.asp],
-        ['Tipo Assistito', item.ssnTipoAssistito],
-        ['N. Tessera', item.ssnNumeroTessera],
-        ['Inizio Assistenza', formatDate(item.ssnInizioAssistenza)],
-        ['Fine Assistenza', formatDate(item.ssnFineAssistenza)],
-        ['Motiv. Fine', item.ssnMotivazioneFineAssistenza],
-        ['Data Decesso', formatDate(item.dataDecesso)]
+        ['ASP', item.asp], ['Tipo Assistito', item.ssnTipoAssistito], ['N. Tessera', item.ssnNumeroTessera],
+        ['Inizio Assistenza', formatDate(item.ssnInizioAssistenza)], ['Fine Assistenza', formatDate(item.ssnFineAssistenza)],
+        ['Motiv. Fine', item.ssnMotivazioneFineAssistenza], ['Data Decesso', formatDate(item.dataDecesso)]
     ]);
-
     const tipoMedico = (item.MMGTipo === 'P' || item.MMGTipo === 'PLS') ? 'Pediatra' : ((item.MMGTipo === 'M' || item.MMGTipo === 'MMG') ? 'MMG' : item.MMGTipo);
     renderDetailGrid('detailMedico', [
-        ['Tipo', tipoMedico],
-        ['Cognome', item.MMGCognome],
-        ['Nome', item.MMGNome],
-        ['CF Medico', item.MMGCf],
-        ['Cod. Regionale', item.MMGCodReg],
-        ['Data Scelta', formatDate(item.MMGDataScelta)],
-        ['Data Revoca', formatDate(item.MMGDataRevoca)],
-        ['Ultima Operazione', item.MMGUltimaOperazione],
-        ['Ultimo Stato', item.MMGUltimoStato]
+        ['Tipo', tipoMedico], ['Cognome', item.MMGCognome], ['Nome', item.MMGNome],
+        ['CF Medico', item.MMGCf], ['Cod. Regionale', item.MMGCodReg],
+        ['Data Scelta', formatDate(item.MMGDataScelta)], ['Data Revoca', formatDate(item.MMGDataRevoca)],
+        ['Ultima Operazione', item.MMGUltimaOperazione], ['Ultimo Stato', item.MMGUltimoStato]
     ]);
 
     section.style.display = '';
@@ -262,7 +192,6 @@ function renderDetailGrid(containerId, fields) {
         .join('');
 }
 
-// Copy actions
 document.getElementById('copyJsonBtn').addEventListener('click', () => {
     if (!window._selectedAssistito) { showAlert('Nessun assistito selezionato', 'warning'); return; }
     navigator.clipboard.writeText(JSON.stringify(window._selectedAssistito, null, 2))
@@ -283,10 +212,8 @@ document.getElementById('closeDetailBtn').addEventListener('click', () => {
     window._selectedAssistito = null;
 });
 
-// Loading
 function showLoading(show) {
     document.getElementById('loadingOverlay').style.display = show ? 'flex' : 'none';
 }
 
-// Init
 checkAuth();

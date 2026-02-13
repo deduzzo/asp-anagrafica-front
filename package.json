@@ -7,8 +7,6 @@
     "start": "node server.js"
   },
   "dependencies": {
-    "express": "^4.21.0",
-    "express-session": "^1.18.0",
     "ws": "^8.18.0"
   }
 }

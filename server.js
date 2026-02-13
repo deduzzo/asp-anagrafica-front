@@ -1,41 +1,82 @@
-const express = require('express');
-const session = require('express-session');
+const fs = require('fs');
 const path = require('path');
+const https = require('https');
 const http = require('http');
 const { WebSocketServer } = require('ws');
 
-const authRoutes = require('./src/routes/auth');
-const anagraficaRoutes = require('./src/routes/anagrafica');
+const WEB_PORT = parseInt(process.env.WEB_PORT || '3000');
+const WS_PORT = parseInt(process.env.WS_PORT || '12345');
 
-const app = express();
-const PORT = process.env.PORT || 3000;
+// Percorsi certificati SSL (personalizzabili via env)
+const SSL_CERT = process.env.SSL_CERT || '/etc/letsencrypt/live/ws1.asp.messina.it/fullchain.pem';
+const SSL_KEY = process.env.SSL_KEY || '/etc/letsencrypt/live/ws1.asp.messina.it/privkey.pem';
 
-// Session
-app.use(session({
-    secret: 'asp-anagrafica-secret-key',
-    resave: false,
-    saveUninitialized: false,
-    cookie: { maxAge: 8 * 60 * 60 * 1000 }
-}));
+let sslOpts = null;
+try {
+    if (fs.existsSync(SSL_CERT) && fs.existsSync(SSL_KEY)) {
+        sslOpts = { cert: fs.readFileSync(SSL_CERT), key: fs.readFileSync(SSL_KEY) };
+    }
+} catch (err) {
+    console.error('Errore caricamento SSL:', err.message);
+}
 
-app.use(express.json());
-app.use(express.static(path.join(__dirname, 'public')));
+/* ======================== Static file server ======================== */
+const STATIC_DIR = path.join(__dirname, 'public');
+const MIME = {
+    '.html': 'text/html', '.css': 'text/css', '.js': 'application/javascript',
+    '.json': 'application/json', '.png': 'image/png', '.jpg': 'image/jpeg',
+    '.svg': 'image/svg+xml', '.ico': 'image/x-icon', '.woff2': 'font/woff2',
+};
 
-// Routes API
-app.use('/api', authRoutes);
-app.use('/api', anagraficaRoutes);
+function handleRequest(req, res) {
+    let url = req.url.split('?')[0];
+    if (url === '/' || url === '') url = '/index.html';
 
-// WS clients
-const wsClients = new Set();
+    const filePath = path.join(STATIC_DIR, url);
 
-function setupWsConnection(ws) {
-    wsClients.add(ws);
-    console.log(`WS client connesso. Totale: ${wsClients.size}`);
+    // Sicurezza: impedisce path traversal
+    if (!filePath.startsWith(STATIC_DIR)) {
+        res.writeHead(403);
+        res.end('Forbidden');
+        return;
+    }
 
-    // Relay: ogni messaggio ricevuto viene inoltrato a tutti gli altri client
+    fs.readFile(filePath, (err, data) => {
+        if (err) {
+            res.writeHead(404);
+            res.end('Not Found');
+            return;
+        }
+        const ext = path.extname(filePath);
+        res.writeHead(200, { 'Content-Type': MIME[ext] || 'application/octet-stream' });
+        res.end(data);
+    });
+}
+
+const webServer = sslOpts
+    ? https.createServer(sslOpts, handleRequest)
+    : http.createServer(handleRequest);
+
+webServer.listen(WEB_PORT, () => {
+    const proto = sslOpts ? 'https' : 'http';
+    console.log(`Web server attivo: ${proto}://0.0.0.0:${WEB_PORT}`);
+});
+
+/* ======================== WebSocket server ======================== */
+const wsServer = sslOpts
+    ? https.createServer(sslOpts)
+    : http.createServer();
+
+const wss = new WebSocketServer({ server: wsServer });
+const clients = new Set();
+
+wss.on('connection', (ws) => {
+    clients.add(ws);
+    console.log(`Client WS connesso. Totale: ${clients.size}`);
+
     ws.on('message', (data) => {
         const msg = data.toString();
-        wsClients.forEach((client) => {
+        clients.forEach((client) => {
             if (client !== ws && client.readyState === 1) {
                 try { client.send(msg); } catch {}
             }
@@ -43,48 +84,17 @@ function setupWsConnection(ws) {
     });
 
     ws.on('close', () => {
-        wsClients.delete(ws);
-        console.log(`WS client disconnesso. Totale: ${wsClients.size}`);
+        clients.delete(ws);
+        console.log(`Client WS disconnesso. Totale: ${clients.size}`);
     });
 
     ws.on('error', (err) => {
         console.error('WS error:', err.message);
-        wsClients.delete(ws);
+        clients.delete(ws);
     });
-}
-
-// WS status (polling dal browser)
-app.get('/api/ws/status', (req, res) => {
-    res.json({ clients: wsClients.size, active: true });
 });
 
-// WS command via HTTP POST (il browser invia, il server rilancia ai client WS)
-app.post('/api/ws/command', (req, res) => {
-    const { command, data } = req.body;
-    if (!command) return res.status(400).json({ error: 'Comando mancante' });
-
-    const message = JSON.stringify({ command, data: data || {} });
-    let sent = 0, errors = 0;
-
-    wsClients.forEach((client) => {
-        if (client.readyState === 1) {
-            try { client.send(message); sent++; } catch { errors++; }
-        } else { errors++; }
-    });
-
-    res.json({ sent, errors, total: wsClients.size });
-});
-
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
-
-// HTTP server + WebSocket sullo stesso server
-const server = http.createServer(app);
-const wss = new WebSocketServer({ server });
-wss.on('connection', setupWsConnection);
-
-server.listen(PORT, () => {
-    console.log(`Server attivo su http://localhost:${PORT}`);
-    console.log(`WebSocket attivo sullo stesso server`);
+wsServer.listen(WS_PORT, () => {
+    const proto = sslOpts ? 'wss' : 'ws';
+    console.log(`WebSocket server attivo: ${proto}://0.0.0.0:${WS_PORT}`);
 });
