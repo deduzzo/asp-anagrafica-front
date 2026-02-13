@@ -29,7 +29,7 @@ function updateWsBadge(connected) {
 
 function sendWsCommand(command, data) {
     if (!socket || !socket.connected) {
-        showAlert('WebSocket non connesso', 'warning');
+        showAlert('Socket.io non connesso', 'warning');
         return;
     }
     try {
