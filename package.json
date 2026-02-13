@@ -4,9 +4,11 @@
   "description": "ASP Messina - Anagrafica Assistiti Web Interface",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "build": "npm install"
   },
   "dependencies": {
+    "express": "^4.21.0",
     "ws": "^8.18.0"
   }
 }

@@ -1,8 +1,8 @@
-// WebSocket - connessione diretta al server WSS sulla porta 12345
+// WebSocket - connessione tramite reverse proxy sullo stesso path dell'app
 let wsConnection = null;
 
-// WSS sullo stesso host, porta 12345
-const WS_URL = 'wss://' + window.location.hostname + ':12345';
+const WS_PROTOCOL = location.protocol === 'https:' ? 'wss:' : 'ws:';
+const WS_URL = WS_PROTOCOL + '//' + location.host + window.APP_BASE;
 
 function connectWs() {
     try {

@@ -1,6 +1,5 @@
 node_modules/
 .idea/
 .claude/
-src/
 package-lock.json
 *.log
