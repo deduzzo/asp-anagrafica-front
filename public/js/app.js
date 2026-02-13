@@ -2,11 +2,6 @@
 window._selectedAssistito = null;
 let currentSearchType = 'cf';
 
-// Token da sessionStorage
-function getToken() {
-    return sessionStorage.getItem('asp_token');
-}
-
 // Utility: formatta data (gestisce sia stringhe che Unix timestamps)
 function formatDate(val) {
     if (!val && val !== 0) return '';
@@ -19,31 +14,34 @@ function formatDate(val) {
 // Alert system
 function showAlert(message, type = 'info', duration = 3000) {
     const container = document.getElementById('alertContainer');
-    const alert = document.createElement('div');
-    alert.className = `alert alert-${type}`;
-    alert.innerHTML = `<span>${message}</span><button class="alert-close">&times;</button>`;
-    container.appendChild(alert);
-    alert.querySelector('.alert-close').addEventListener('click', () => alert.remove());
+    const el = document.createElement('div');
+    el.className = `alert alert-${type}`;
+    el.innerHTML = `<span>${message}</span><button class="alert-close">&times;</button>`;
+    container.appendChild(el);
+    el.querySelector('.alert-close').addEventListener('click', () => el.remove());
     if (duration > 0) {
-        setTimeout(() => { if (alert.parentNode) alert.remove(); }, duration);
+        setTimeout(() => { if (el.parentNode) el.remove(); }, duration);
     }
 }
 
 // Auth check
-function checkAuth() {
-    const token = getToken();
-    if (!token) {
+async function checkAuth() {
+    try {
+        const res = await fetch(APP_BASE + 'api/auth/status');
+        const data = await res.json();
+        if (!data.authenticated) {
+            window.location.href = APP_BASE;
+            return;
+        }
+        document.getElementById('userInfo').textContent = data.username;
+    } catch {
         window.location.href = APP_BASE;
-        return;
     }
-    const username = sessionStorage.getItem('asp_username') || '';
-    document.getElementById('userInfo').textContent = username;
 }
 
 // Logout
-document.getElementById('logoutBtn').addEventListener('click', () => {
-    sessionStorage.removeItem('asp_token');
-    sessionStorage.removeItem('asp_username');
+document.getElementById('logoutBtn').addEventListener('click', async () => {
+    await fetch(APP_BASE + 'api/logout', { method: 'POST' });
     window.location.href = APP_BASE;
 });
 
@@ -94,33 +92,17 @@ document.getElementById('searchForm').addEventListener('submit', async (e) => {
 
     showLoading(true);
     try {
-        const token = getToken();
-        if (!token) {
+        const res = await fetch(APP_BASE + 'api/anagrafica/ricerca', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(params)
+        });
+        if (res.status === 401) {
             showAlert('Sessione scaduta', 'error');
             setTimeout(() => { window.location.href = APP_BASE; }, 1500);
             return;
         }
-
-        // Chiamata diretta all'API ASP
-        const qs = new URLSearchParams();
-        for (const [key, value] of Object.entries(params)) {
-            if (value !== undefined && value !== null && value !== '') {
-                qs.append(key, value);
-            }
-        }
-        const res = await fetch('/api/v1/anagrafica/ricerca?' + qs.toString(), {
-            method: 'POST',
-            headers: { 'Authorization': 'Bearer ' + token }
-        });
         const body = await res.json();
-
-        if (res.status === 401) {
-            showAlert('Sessione scaduta, effettuare nuovamente il login', 'error');
-            sessionStorage.removeItem('asp_token');
-            setTimeout(() => { window.location.href = APP_BASE; }, 1500);
-            return;
-        }
-
         renderResults(body);
     } catch (err) {
         showAlert('Errore nella ricerca', 'error');
@@ -129,7 +111,7 @@ document.getElementById('searchForm').addEventListener('submit', async (e) => {
     }
 });
 
-// Render results - gestisce envelope { ok, err, data }
+// Render results
 function renderResults(body) {
     const section = document.getElementById('resultsSection');
     const tbody = document.getElementById('resultsBody');

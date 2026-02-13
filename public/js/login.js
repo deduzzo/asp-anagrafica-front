@@ -10,25 +10,16 @@ document.getElementById('loginForm').addEventListener('submit', async (e) => {
     btn.textContent = 'Accesso in corso...';
 
     try {
-        const qs = new URLSearchParams({
-            login: username + '@asp.messina.it',
-            password: password,
-            scopi: 'asp5-anagrafica',
-            ambito: 'api',
-            domain: 'asp.messina.it'
+        const res = await fetch(APP_BASE + 'api/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, password })
         });
-        const res = await fetch('/api/v1/login/get-token?' + qs.toString(), {
-            method: 'POST'
-        });
-        const body = await res.json();
-        if (body.ok && body.data) {
-            // Salva token e username in sessionStorage
-            const token = typeof body.data === 'string' ? body.data : (body.data.token || body.data.accessToken || JSON.stringify(body.data));
-            sessionStorage.setItem('asp_token', token);
-            sessionStorage.setItem('asp_username', username);
+        const data = await res.json();
+        if (res.ok && data.ok) {
             window.location.href = APP_BASE + 'app.html';
         } else {
-            errorEl.textContent = body.err?.msg || 'Credenziali non valide';
+            errorEl.textContent = data.error || 'Errore durante il login';
             errorEl.style.display = 'block';
         }
     } catch (err) {
