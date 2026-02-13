@@ -2,10 +2,15 @@
 window._selectedAssistito = null;
 let currentSearchType = 'cf';
 
-// Utility: converte Unix timestamp (secondi) in data leggibile DD/MM/YYYY
+// Token da sessionStorage
+function getToken() {
+    return sessionStorage.getItem('asp_token');
+}
+
+// Utility: formatta data (gestisce sia stringhe che Unix timestamps)
 function formatDate(val) {
     if (!val && val !== 0) return '';
-    if (typeof val === 'string') return val; // gia' formattato
+    if (typeof val === 'string') return val;
     const d = new Date(val * 1000);
     if (isNaN(d.getTime())) return String(val);
     return d.toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric' });
@@ -25,23 +30,20 @@ function showAlert(message, type = 'info', duration = 3000) {
 }
 
 // Auth check
-async function checkAuth() {
-    try {
-        const res = await fetch(APP_BASE + 'api/auth/status');
-        const data = await res.json();
-        if (!data.authenticated) {
-            window.location.href = APP_BASE;
-            return;
-        }
-        document.getElementById('userInfo').textContent = data.username;
-    } catch {
+function checkAuth() {
+    const token = getToken();
+    if (!token) {
         window.location.href = APP_BASE;
+        return;
     }
+    const username = sessionStorage.getItem('asp_username') || '';
+    document.getElementById('userInfo').textContent = username;
 }
 
 // Logout
-document.getElementById('logoutBtn').addEventListener('click', async () => {
-    await fetch(APP_BASE + 'api/logout', { method: 'POST' });
+document.getElementById('logoutBtn').addEventListener('click', () => {
+    sessionStorage.removeItem('asp_token');
+    sessionStorage.removeItem('asp_username');
     window.location.href = APP_BASE;
 });
 
@@ -70,7 +72,6 @@ document.getElementById('searchForm').addEventListener('submit', async (e) => {
         const nome = document.getElementById('nome').value.trim();
         const dn = document.getElementById('dataNascita').value;
 
-        // Validazione: servono almeno 2 parametri tra nome (min 3), cognome (min 3), dataNascita (min 4)
         let validParams = 0;
         if (cognome && cognome.length >= 3) validParams++;
         if (nome && nome.length >= 3) validParams++;
@@ -93,17 +94,33 @@ document.getElementById('searchForm').addEventListener('submit', async (e) => {
 
     showLoading(true);
     try {
-        const res = await fetch(APP_BASE + 'api/anagrafica/ricerca', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(params)
-        });
-        if (res.status === 401) {
+        const token = getToken();
+        if (!token) {
             showAlert('Sessione scaduta', 'error');
             setTimeout(() => { window.location.href = APP_BASE; }, 1500);
             return;
         }
+
+        // Chiamata diretta all'API ASP
+        const qs = new URLSearchParams();
+        for (const [key, value] of Object.entries(params)) {
+            if (value !== undefined && value !== null && value !== '') {
+                qs.append(key, value);
+            }
+        }
+        const res = await fetch('/api/v1/anagrafica/ricerca?' + qs.toString(), {
+            method: 'POST',
+            headers: { 'Authorization': 'Bearer ' + token }
+        });
         const body = await res.json();
+
+        if (res.status === 401) {
+            showAlert('Sessione scaduta, effettuare nuovamente il login', 'error');
+            sessionStorage.removeItem('asp_token');
+            setTimeout(() => { window.location.href = APP_BASE; }, 1500);
+            return;
+        }
+
         renderResults(body);
     } catch (err) {
         showAlert('Errore nella ricerca', 'error');
@@ -118,14 +135,12 @@ function renderResults(body) {
     const tbody = document.getElementById('resultsBody');
     const count = document.getElementById('resultsCount');
 
-    // Gestisci errori API
     if (body.ok === false && body.err) {
         showAlert(body.err.msg || 'Errore nella ricerca', 'error');
         section.style.display = 'none';
         return;
     }
 
-    // Estrai i dati dall'envelope
     let items = [];
     const data = body.data !== undefined ? body.data : body;
 
@@ -167,7 +182,6 @@ function renderResults(body) {
     section.style.display = '';
     document.getElementById('detailSection').style.display = 'none';
 
-    // Auto-select se risultato singolo
     if (items.length === 1) {
         showDetail(items[0]);
     }
@@ -183,19 +197,34 @@ function showDetail(item) {
         showAlert('Attenzione: paziente deceduto', 'warning', 5000);
     }
 
-    // Calcola eta'
+    // Calcola eta
     let eta = '';
     if (item.dataNascita) {
-        const nascita = typeof item.dataNascita === 'number' ? new Date(item.dataNascita * 1000) : new Date(item.dataNascita);
-        const ref = item.dataDecesso
-            ? (typeof item.dataDecesso === 'number' ? new Date(item.dataDecesso * 1000) : new Date(item.dataDecesso))
-            : new Date();
+        let nascita;
+        if (typeof item.dataNascita === 'number') {
+            nascita = new Date(item.dataNascita * 1000);
+        } else if (typeof item.dataNascita === 'string' && item.dataNascita.includes('/')) {
+            const parts = item.dataNascita.split('/');
+            nascita = new Date(parts[2], parts[1] - 1, parts[0]);
+        } else {
+            nascita = new Date(item.dataNascita);
+        }
+
+        let ref = new Date();
+        if (item.dataDecesso) {
+            if (typeof item.dataDecesso === 'number') {
+                ref = new Date(item.dataDecesso * 1000);
+            } else if (typeof item.dataDecesso === 'string' && item.dataDecesso.includes('/')) {
+                const parts = item.dataDecesso.split('/');
+                ref = new Date(parts[2], parts[1] - 1, parts[0]);
+            }
+        }
+
         if (!isNaN(nascita.getTime())) {
             eta = Math.floor((ref - nascita) / (365.25 * 24 * 60 * 60 * 1000));
         }
     }
 
-    // Anagrafica
     renderDetailGrid('detailAnagrafica', [
         ['Codice Fiscale', item.cf || item.codiceFiscale],
         ['CF Normalizzato', item.cfNormalizzato],
@@ -209,7 +238,6 @@ function showDetail(item) {
         ['Eta', eta]
     ]);
 
-    // Residenza
     renderDetailGrid('detailResidenza', [
         ['Indirizzo', item.indirizzoResidenza],
         ['CAP', item.capResidenza],
@@ -217,7 +245,6 @@ function showDetail(item) {
         ['Cod. ISTAT Comune', item.codIstatComuneResidenza]
     ]);
 
-    // Sanitari
     renderDetailGrid('detailSanitari', [
         ['ASP', item.asp],
         ['Tipo Assistito', item.ssnTipoAssistito],
@@ -228,7 +255,6 @@ function showDetail(item) {
         ['Data Decesso', formatDate(item.dataDecesso)]
     ]);
 
-    // Medico
     const tipoMedico = (item.MMGTipo === 'P' || item.MMGTipo === 'PLS') ? 'Pediatra' : ((item.MMGTipo === 'M' || item.MMGTipo === 'MMG') ? 'MMG' : item.MMGTipo);
     renderDetailGrid('detailMedico', [
         ['Tipo', tipoMedico],

@@ -1,49 +1,61 @@
-// Polling stato WebSocket
-let wsPollingInterval = null;
+// WebSocket - connessione diretta al server WS se disponibile
+let wsConnection = null;
+let wsReconnectInterval = null;
 
-function startWsPolling() {
-    updateWsStatus();
-    wsPollingInterval = setInterval(updateWsStatus, 3000);
-}
-
-async function updateWsStatus() {
+function connectWs() {
     try {
-        const res = await fetch(APP_BASE + 'api/ws/status');
-        const data = await res.json();
-        const badge = document.getElementById('wsStatus');
-        if (badge) {
-            badge.textContent = `WS: ${data.clients}`;
-            badge.classList.toggle('ws-active', data.clients > 0);
-        }
+        // Connessione diretta al WS server sulla porta 12345
+        const wsHost = window.location.hostname;
+        wsConnection = new WebSocket('ws://' + wsHost + ':12345');
+
+        wsConnection.onopen = () => {
+            updateWsBadge(true);
+        };
+
+        wsConnection.onclose = () => {
+            wsConnection = null;
+            updateWsBadge(false);
+        };
+
+        wsConnection.onerror = () => {
+            wsConnection = null;
+            updateWsBadge(false);
+        };
     } catch {
-        // silently ignore
+        updateWsBadge(false);
     }
 }
 
-async function sendWsCommand(command, data) {
+function updateWsBadge(connected) {
+    const badge = document.getElementById('wsStatus');
+    if (badge) {
+        badge.textContent = connected ? 'WS: connesso' : 'WS: non connesso';
+        badge.classList.toggle('ws-active', connected);
+    }
+}
+
+function sendWsCommand(command, data) {
+    if (!wsConnection || wsConnection.readyState !== WebSocket.OPEN) {
+        showAlert('WebSocket non connesso', 'warning');
+        return;
+    }
     try {
-        const res = await fetch(APP_BASE + 'api/ws/command', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ command, data: data || {} })
-        });
-        const result = await res.json();
-        if (result.total === 0) {
-            showAlert('Nessun client WebSocket connesso', 'warning');
-        } else if (result.errors === 0) {
-            showAlert(`Comando "${command}" inviato a ${result.sent} client`, 'success');
-        } else {
-            showAlert(`Inviato a ${result.sent} client, ${result.errors} errori`, 'warning');
-        }
-        return result;
-    } catch (err) {
+        wsConnection.send(JSON.stringify({ command, data: data || {} }));
+        showAlert(`Comando "${command}" inviato`, 'success');
+    } catch {
         showAlert('Errore nell\'invio del comando WebSocket', 'error');
     }
 }
 
 // Bind WS command buttons
 document.addEventListener('DOMContentLoaded', () => {
-    startWsPolling();
+    connectWs();
+    // Riconnessione periodica
+    wsReconnectInterval = setInterval(() => {
+        if (!wsConnection || wsConnection.readyState !== WebSocket.OPEN) {
+            connectWs();
+        }
+    }, 5000);
 
     document.querySelectorAll('[data-cmd]').forEach(btn => {
         btn.addEventListener('click', () => {
