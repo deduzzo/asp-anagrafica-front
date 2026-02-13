@@ -1,0 +1,14 @@
+{
+  "name": "asp-anagrafica-front",
+  "version": "1.0.0",
+  "description": "ASP Messina - Anagrafica Assistiti Web Interface",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.21.0",
+    "express-session": "^1.18.0",
+    "ws": "^8.18.0"
+  }
+}

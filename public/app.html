@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ASP Messina - Anagrafica</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <!-- Header -->
+    <header class="app-header">
+        <div class="header-left">
+            <h1>ASP Messina - Anagrafica</h1>
+        </div>
+        <div class="header-right">
+            <span id="userInfo" class="user-info"></span>
+            <span id="wsStatus" class="ws-badge" title="Client WebSocket connessi">WS: 0</span>
+            <button id="logoutBtn" class="btn btn-small btn-outline">Esci</button>
+        </div>
+    </header>
+
+    <!-- Alert container -->
+    <div id="alertContainer" class="alert-container"></div>
+
+    <main class="app-main">
+        <!-- Pannello Ricerca -->
+        <section class="panel search-panel">
+            <div class="panel-header">
+                <h2>Ricerca Assistito</h2>
+                <div class="search-tabs">
+                    <button class="tab-btn active" data-tab="cf">Codice Fiscale</button>
+                    <button class="tab-btn" data-tab="details">Nome / Cognome</button>
+                </div>
+            </div>
+            <form id="searchForm" class="search-form">
+                <!-- Ricerca per CF -->
+                <div id="searchCF" class="search-fields">
+                    <div class="form-group">
+                        <label for="codiceFiscale">Codice Fiscale</label>
+                        <input type="text" id="codiceFiscale" maxlength="16" placeholder="RSSMRA85M01H501Z" style="text-transform:uppercase;">
+                    </div>
+                </div>
+                <!-- Ricerca per dettagli -->
+                <div id="searchDetails" class="search-fields" style="display:none;">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="cognome">Cognome</label>
+                            <input type="text" id="cognome" placeholder="Rossi">
+                        </div>
+                        <div class="form-group">
+                            <label for="nome">Nome</label>
+                            <input type="text" id="nome" placeholder="Mario">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="dataNascita">Data di Nascita</label>
+                            <input type="date" id="dataNascita">
+                        </div>
+                        <div class="form-group">
+                            <label for="sesso">Sesso</label>
+                            <select id="sesso">
+                                <option value="">-- Tutti --</option>
+                                <option value="M">Maschio</option>
+                                <option value="F">Femmina</option>
+                            </select>
+                        </div>
+                    </div>
+                    <details class="optional-fields">
+                        <summary>Campi opzionali</summary>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="comuneNascita">Comune Nascita</label>
+                                <input type="text" id="comuneNascita">
+                            </div>
+                            <div class="form-group">
+                                <label for="comuneResidenza">Comune Residenza</label>
+                                <input type="text" id="comuneResidenza">
+                            </div>
+                        </div>
+                    </details>
+                </div>
+                <div class="search-actions">
+                    <button type="submit" id="searchBtn" class="btn btn-primary">Cerca</button>
+                    <button type="reset" class="btn btn-outline">Pulisci</button>
+                </div>
+            </form>
+        </section>
+
+        <!-- Risultati -->
+        <section id="resultsSection" class="panel results-panel" style="display:none;">
+            <div class="panel-header">
+                <h2>Risultati <span id="resultsCount" class="badge"></span></h2>
+            </div>
+            <div class="table-wrap">
+                <table id="resultsTable">
+                    <thead>
+                        <tr>
+                            <th>Codice Fiscale</th>
+                            <th>Cognome</th>
+                            <th>Nome</th>
+                            <th>Data Nascita</th>
+                            <th>Comune Residenza</th>
+                            <th>Stato</th>
+                        </tr>
+                    </thead>
+                    <tbody id="resultsBody"></tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Dettaglio Assistito -->
+        <section id="detailSection" class="panel detail-panel" style="display:none;">
+            <div class="panel-header">
+                <h2>Dettaglio Assistito</h2>
+                <div class="detail-actions">
+                    <button id="copyJsonBtn" class="btn btn-small btn-outline" title="Copia JSON">Copia JSON</button>
+                    <button id="copyCfBtn" class="btn btn-small btn-outline" title="Copia CF">Copia CF</button>
+                    <button id="closeDetailBtn" class="btn btn-small btn-outline">Chiudi</button>
+                </div>
+            </div>
+            <div id="detailContent" class="detail-content">
+                <!-- Dati Anagrafici -->
+                <div class="detail-section">
+                    <h3>Dati Anagrafici</h3>
+                    <div class="detail-grid" id="detailAnagrafica"></div>
+                </div>
+                <!-- Residenza -->
+                <div class="detail-section">
+                    <h3>Residenza</h3>
+                    <div class="detail-grid" id="detailResidenza"></div>
+                </div>
+                <!-- Dati Sanitari -->
+                <div class="detail-section">
+                    <h3>Dati Sanitari</h3>
+                    <div class="detail-grid" id="detailSanitari"></div>
+                </div>
+                <!-- Medico -->
+                <div class="detail-section">
+                    <h3>Medico</h3>
+                    <div class="detail-grid" id="detailMedico"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Comandi WebSocket -->
+        <section class="panel ws-panel">
+            <div class="panel-header">
+                <h2>Comandi WebSocket</h2>
+            </div>
+            <div class="ws-commands">
+                <button class="btn btn-ws" data-cmd="inviaDatiPaziente" title="Invia dati paziente selezionato">Invia Dati Paziente</button>
+                <button class="btn btn-ws" data-cmd="ricercaAnagrafica" title="Avvia ricerca anagrafica">Ricerca Anagrafica</button>
+                <button class="btn btn-ws" data-cmd="aggiungiNuovoAssistito" title="Aggiungi nuovo assistito">Nuovo Assistito</button>
+                <button class="btn btn-ws" data-cmd="salva" title="Salva">Salva</button>
+                <button class="btn btn-ws" data-cmd="schedaIndirizzo" title="Apri scheda indirizzo">Scheda Indirizzo</button>
+                <button class="btn btn-ws" data-cmd="metodoPagamento" title="Metodo pagamento">Metodo Pagamento</button>
+            </div>
+        </section>
+    </main>
+
+    <!-- Loading overlay -->
+    <div id="loadingOverlay" class="loading-overlay" style="display:none;">
+        <div class="spinner"></div>
+    </div>
+
+    <script src="/js/app.js"></script>
+    <script src="/js/ws.js"></script>
+</body>
+</html>
