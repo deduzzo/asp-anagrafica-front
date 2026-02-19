@@ -51,6 +51,7 @@ document.getElementById('searchForm').addEventListener('submit', async (e) => {
         const cf = document.getElementById('codiceFiscale').value.trim().toUpperCase();
         if (!cf || cf.length < 5) { showAlert('Inserire almeno 5 caratteri del codice fiscale', 'warning'); return; }
         params.codiceFiscale = cf;
+        params.forzaAggiornamentoTs = true;
     } else {
         const cognome = document.getElementById('cognome').value.trim();
         const nome = document.getElementById('nome').value.trim();
