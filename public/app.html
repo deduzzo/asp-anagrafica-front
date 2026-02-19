@@ -14,8 +14,7 @@
         </div>
         <div class="header-right">
             <span id="userInfo" class="user-info"></span>
-            <span id="wsStatus" class="ws-badge" title="Client WebSocket connessi">WS: 0</span>
-            <button id="logoutBtn" class="btn btn-small btn-outline">Esci</button>
+<button id="logoutBtn" class="btn btn-small btn-outline">Esci</button>
         </div>
     </header>
 
@@ -143,20 +142,6 @@
             </div>
         </section>
 
-        <!-- Comandi WebSocket -->
-        <section class="panel ws-panel">
-            <div class="panel-header">
-                <h2>Comandi WebSocket</h2>
-            </div>
-            <div class="ws-commands">
-                <button class="btn btn-ws" data-cmd="inviaDatiPaziente" title="Invia dati paziente selezionato">Invia Dati Paziente</button>
-                <button class="btn btn-ws" data-cmd="ricercaAnagrafica" title="Avvia ricerca anagrafica">Ricerca Anagrafica</button>
-                <button class="btn btn-ws" data-cmd="aggiungiNuovoAssistito" title="Aggiungi nuovo assistito">Nuovo Assistito</button>
-                <button class="btn btn-ws" data-cmd="salva" title="Salva">Salva</button>
-                <button class="btn btn-ws" data-cmd="schedaIndirizzo" title="Apri scheda indirizzo">Scheda Indirizzo</button>
-                <button class="btn btn-ws" data-cmd="metodoPagamento" title="Metodo pagamento">Metodo Pagamento</button>
-            </div>
-        </section>
     </main>
 
     <!-- Loading overlay -->
@@ -169,8 +154,6 @@
         var m = window.location.pathname.match(/^\/apps\/([^\/]+)/);
         window.APP_BASE = m ? '/apps/' + m[1] + '/' : '/';
     </script>
-    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
     <script src="js/app.js"></script>
-    <script src="js/ws.js"></script>
 </body>
 </html>
