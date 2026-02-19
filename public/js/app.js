@@ -51,7 +51,9 @@ document.getElementById('searchForm').addEventListener('submit', async (e) => {
         const cf = document.getElementById('codiceFiscale').value.trim().toUpperCase();
         if (!cf || cf.length < 5) { showAlert('Inserire almeno 5 caratteri del codice fiscale', 'warning'); return; }
         params.codiceFiscale = cf;
-        params.forzaAggiornamentoTs = true;
+        if (document.getElementById('forzaAggiornamentoTs').checked) {
+            params.forzaAggiornamentoTs = true;
+        }
     } else {
         const cognome = document.getElementById('cognome').value.trim();
         const nome = document.getElementById('nome').value.trim();
@@ -162,11 +164,13 @@ function showDetail(item) {
         ['Codice Fiscale', item.cf || item.codiceFiscale], ['CF Normalizzato', item.cfNormalizzato],
         ['Cognome', item.cognome], ['Nome', item.nome], ['Sesso', item.sesso],
         ['Data Nascita', formatDate(item.dataNascita)], ['Comune Nascita', item.comuneNascita],
-        ['Cod. ISTAT Nascita', item.codIstatComuneNascita], ['Provincia Nascita', item.provinciaNascita], ['Eta', eta]
+        ['Cod. Comune Nascita', item.codComuneNascita], ['Cod. ISTAT Nascita', item.codIstatComuneNascita],
+        ['Provincia Nascita', item.provinciaNascita], ['Eta', eta]
     ]);
     renderDetailGrid('detailResidenza', [
         ['Indirizzo', item.indirizzoResidenza], ['CAP', item.capResidenza],
-        ['Comune', item.comuneResidenza], ['Cod. ISTAT Comune', item.codIstatComuneResidenza]
+        ['Comune', item.comuneResidenza], ['Cod. Comune Residenza', item.codComuneResidenza],
+        ['Cod. ISTAT Comune', item.codIstatComuneResidenza]
     ]);
     renderDetailGrid('detailSanitari', [
         ['ASP', item.asp], ['Tipo Assistito', item.ssnTipoAssistito], ['N. Tessera', item.ssnNumeroTessera],
@@ -180,6 +184,27 @@ function showDetail(item) {
         ['Data Scelta', formatDate(item.MMGDataScelta)], ['Data Revoca', formatDate(item.MMGDataRevoca)],
         ['Ultima Operazione', item.MMGUltimaOperazione], ['Ultimo Stato', item.MMGUltimoStato]
     ]);
+    renderDetailGrid('detailSistema', [
+        ['Ultima Verifica', item.lastCheck], ['Creato il', item.createdAt], ['Aggiornato il', item.updatedAt]
+    ]);
+
+    // Mappa OpenStreetMap
+    const mapSection = document.getElementById('detailMapSection');
+    const mapContainer = document.getElementById('detailMap');
+    if (item.lat && item.long) {
+        mapSection.style.display = '';
+        mapContainer.innerHTML = '';
+        const map = L.map('detailMap').setView([item.lat, item.long], 16);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; OpenStreetMap contributors'
+        }).addTo(map);
+        L.marker([item.lat, item.long]).addTo(map)
+            .bindPopup(item.indirizzoResidenza || 'Posizione')
+            .openPopup();
+        setTimeout(() => map.invalidateSize(), 200);
+    } else {
+        mapSection.style.display = 'none';
+    }
 
     section.style.display = '';
     section.scrollIntoView({ behavior: 'smooth' });

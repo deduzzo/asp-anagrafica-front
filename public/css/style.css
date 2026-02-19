@@ -219,6 +219,7 @@ tbody tr:hover { background: #f0f4ff; }
 
 .badge-success { background: #dcfce7; color: var(--success); }
 .badge-danger { background: #fee2e2; color: var(--danger); }
+.badge-warning { background: #fffbeb; color: #b45309; border: 1px solid #fde68a; }
 
 /* Detail */
 .detail-actions { display: flex; gap: 0.5rem; }
@@ -251,6 +252,29 @@ tbody tr:hover { background: #f0f4ff; }
 
 .detail-label { font-size: 0.75rem; color: var(--text-muted); }
 .detail-value { font-size: 0.9rem; font-weight: 500; }
+
+/* Map */
+.detail-map {
+    height: 300px;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+}
+
+/* Checkbox */
+.form-group-inline { margin-bottom: 0.5rem; }
+.checkbox-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.85rem;
+    cursor: pointer;
+    font-weight: 400;
+}
+.checkbox-label input[type="checkbox"] {
+    width: auto;
+    margin: 0;
+    cursor: pointer;
+}
 
 /* Alerts */
 .alert-container {
