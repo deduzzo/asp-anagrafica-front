@@ -7,6 +7,8 @@ const { execSync, spawn } = require('child_process');
 const REPO_OWNER = 'deduzzo';
 const REPO_NAME = 'asp-anagrafica-front';
 const UPDATE_CHECK_INTERVAL = 30 * 60 * 1000;
+const IS_WIN = process.platform === 'win32';
+const IS_MAC = process.platform === 'darwin';
 
 let mainWindow = null;
 let progressWindow = null;
@@ -50,11 +52,22 @@ function isNewer(remote, current) {
     return false;
 }
 
+function findUpdateAsset(release) {
+    if (IS_MAC) {
+        return release.assets.find(a => a.name.endsWith('.zip') && !a.name.endsWith('.blockmap'));
+    }
+    if (IS_WIN) {
+        // Preferisci installer NSIS, poi portable
+        return release.assets.find(a => a.name.endsWith('.exe'));
+    }
+    return null;
+}
+
 async function promptUpdate(version, release) {
     if (!mainWindow || mainWindow.isDestroyed()) return;
 
-    const zipAsset = release.assets.find(a => a.name.endsWith('.zip') && !a.name.endsWith('.blockmap'));
-    if (!zipAsset) return;
+    const asset = findUpdateAsset(release);
+    if (!asset) { console.log('Updater: nessun asset trovato per questa piattaforma'); return; }
 
     const { response } = await dialog.showMessageBox(mainWindow, {
         type: 'info',
@@ -67,7 +80,7 @@ async function promptUpdate(version, release) {
     });
 
     if (response === 0) {
-        performUpdate(version, zipAsset);
+        performUpdate(version, asset);
     }
 }
 
@@ -129,56 +142,25 @@ function updateProgress(text, percent) {
 }
 
 async function performUpdate(version, asset) {
-    // Mostra finestra modale di progresso
     showProgressWindow(version);
 
     const tmpDir = path.join(app.getPath('temp'), 'asp-anagrafica-update');
-    const zipPath = path.join(tmpDir, asset.name);
+    const dlPath = path.join(tmpDir, asset.name);
 
     try {
         fs.mkdirSync(tmpDir, { recursive: true });
 
         // Download
         updateProgress('Download in corso...', 0);
-        await downloadFile(asset.browser_download_url, zipPath, (pct) => {
+        await downloadFile(asset.browser_download_url, dlPath, (pct) => {
             updateProgress(`Download in corso... ${pct}%`, pct);
         });
 
-        // Estrazione
-        updateProgress('Estrazione in corso...', -1);
-        const extractDir = path.join(tmpDir, 'extracted');
-        if (fs.existsSync(extractDir)) fs.rmSync(extractDir, { recursive: true });
-        fs.mkdirSync(extractDir, { recursive: true });
-        execSync(`ditto -xk "${zipPath}" "${extractDir}"`);
-
-        const items = fs.readdirSync(extractDir);
-        const appName = items.find(i => i.endsWith('.app'));
-        if (!appName) throw new Error('App non trovata nello ZIP');
-        const newAppPath = path.join(extractDir, appName);
-
-        // Path app corrente
-        const currentAppPath = process.execPath.replace(/\/Contents\/MacOS\/.*$/, '');
-        console.log('Updater: corrente:', currentAppPath);
-
-        // Script di sostituzione e riavvio
-        updateProgress('Installazione in corso...', -1);
-
-        const scriptPath = path.join(tmpDir, 'update.sh');
-        const script = `#!/bin/bash
-while kill -0 ${process.pid} 2>/dev/null; do sleep 0.3; done
-sleep 0.5
-rm -rf "${currentAppPath}"
-mv "${newAppPath}" "${currentAppPath}"
-open "${currentAppPath}"
-rm -rf "${tmpDir}"
-`;
-        fs.writeFileSync(scriptPath, script, { mode: 0o755 });
-
-        updateProgress('Riavvio in corso...', -1);
-
-        spawn('bash', [scriptPath], { detached: true, stdio: 'ignore' }).unref();
-
-        setTimeout(() => app.quit(), 500);
+        if (IS_MAC) {
+            installMac(version, dlPath, tmpDir);
+        } else if (IS_WIN) {
+            installWin(dlPath, tmpDir);
+        }
 
     } catch (err) {
         console.error('Updater: errore:', err.message);
@@ -195,6 +177,66 @@ rm -rf "${tmpDir}"
     }
 }
 
+// --- macOS: estrai ZIP, sostituisci .app, riavvia ---
+function installMac(version, zipPath, tmpDir) {
+    updateProgress('Estrazione in corso...', -1);
+    const extractDir = path.join(tmpDir, 'extracted');
+    if (fs.existsSync(extractDir)) fs.rmSync(extractDir, { recursive: true });
+    fs.mkdirSync(extractDir, { recursive: true });
+    execSync(`ditto -xk "${zipPath}" "${extractDir}"`);
+
+    const items = fs.readdirSync(extractDir);
+    const appName = items.find(i => i.endsWith('.app'));
+    if (!appName) throw new Error('App non trovata nello ZIP');
+    const newAppPath = path.join(extractDir, appName);
+
+    const currentAppPath = process.execPath.replace(/\/Contents\/MacOS\/.*$/, '');
+    console.log('Updater: corrente:', currentAppPath);
+
+    updateProgress('Installazione in corso...', -1);
+
+    const scriptPath = path.join(tmpDir, 'update.sh');
+    const script = `#!/bin/bash
+while kill -0 ${process.pid} 2>/dev/null; do sleep 0.3; done
+sleep 0.5
+rm -rf "${currentAppPath}"
+mv "${newAppPath}" "${currentAppPath}"
+open "${currentAppPath}"
+rm -rf "${tmpDir}"
+`;
+    fs.writeFileSync(scriptPath, script, { mode: 0o755 });
+
+    updateProgress('Riavvio in corso...', -1);
+    spawn('bash', [scriptPath], { detached: true, stdio: 'ignore' }).unref();
+    setTimeout(() => app.quit(), 500);
+}
+
+// --- Windows: lancia installer NSIS silenzioso, esce ---
+function installWin(exePath, tmpDir) {
+    updateProgress('Installazione in corso...', -1);
+
+    // Crea script batch che aspetta la chiusura, lancia installer, pulizia
+    const batPath = path.join(tmpDir, 'update.bat');
+    const bat = `@echo off
+:wait
+tasklist /FI "PID eq ${process.pid}" 2>NUL | find /I "${process.pid}" >NUL
+if not errorlevel 1 (
+    timeout /t 1 /nobreak >NUL
+    goto wait
+)
+timeout /t 1 /nobreak >NUL
+start "" "${exePath}" /S
+timeout /t 5 /nobreak >NUL
+rmdir /s /q "${tmpDir}"
+`;
+    fs.writeFileSync(batPath, bat);
+
+    updateProgress('Riavvio in corso...', -1);
+    spawn('cmd.exe', ['/c', batPath], { detached: true, stdio: 'ignore', windowsHide: true }).unref();
+    setTimeout(() => app.quit(), 500);
+}
+
+// --- Download con redirect ---
 function downloadFile(url, destPath, onProgress) {
     return new Promise((resolve, reject) => {
         _dl(url, destPath, resolve, reject, onProgress, 5);
