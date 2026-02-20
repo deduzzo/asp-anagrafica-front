@@ -4,7 +4,7 @@ const express = require('express');
 const https = require('https');
 const http = require('http');
 const { createWsServer, broadcastCommand, getClientCount, shutdown: shutdownWs } = require('./wsServer');
-const { initUpdater, downloadUpdate, installUpdate } = require('./updater');
+const { initUpdater } = require('./updater');
 
 const EXPRESS_PORT = 13080;
 const UPSTREAM = 'https://ws1.asp.messina.it';
@@ -101,14 +101,6 @@ function registerIpcHandlers() {
 
     ipcMain.handle('ws:get-client-count', () => {
         return getClientCount();
-    });
-
-    ipcMain.handle('update:download', () => {
-        downloadUpdate();
-    });
-
-    ipcMain.handle('update:install', () => {
-        installUpdate();
     });
 
     ipcMain.handle('app:get-version', () => {

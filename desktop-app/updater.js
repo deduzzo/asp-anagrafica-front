@@ -1,12 +1,7 @@
+const { dialog, app } = require('electron');
 const { autoUpdater } = require('electron-updater');
 
 let mainWindow = null;
-
-function send(channel, data) {
-    if (mainWindow && !mainWindow.isDestroyed()) {
-        mainWindow.webContents.send(channel, data);
-    }
-}
 
 function initUpdater(win) {
     mainWindow = win;
@@ -14,20 +9,51 @@ function initUpdater(win) {
     autoUpdater.autoDownload = false;
     autoUpdater.autoInstallOnAppQuit = true;
 
-    autoUpdater.on('update-available', (info) => {
+    autoUpdater.on('update-available', async (info) => {
         console.log('Update disponibile:', info.version);
-        send('update:available', { version: info.version, releaseDate: info.releaseDate });
+
+        const { response } = await dialog.showMessageBox(mainWindow, {
+            type: 'info',
+            title: 'Aggiornamento disponibile',
+            message: `Nuova versione disponibile: v${info.version}`,
+            detail: `Versione corrente: v${app.getVersion()}\nVuoi scaricare l'aggiornamento?`,
+            buttons: ['Scarica', 'Dopo'],
+            defaultId: 0,
+            cancelId: 1
+        });
+
+        if (response === 0) {
+            autoUpdater.downloadUpdate();
+        }
     });
 
     autoUpdater.on('download-progress', (progress) => {
         const pct = Math.round(progress.percent);
         console.log(`Download: ${pct}%`);
-        send('update:download-progress', { percent: pct });
+        if (mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.setProgressBar(pct / 100);
+        }
     });
 
-    autoUpdater.on('update-downloaded', (info) => {
+    autoUpdater.on('update-downloaded', async (info) => {
         console.log('Update scaricato:', info.version);
-        send('update:downloaded', { version: info.version });
+        if (mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.setProgressBar(-1); // rimuovi barra progresso
+        }
+
+        const { response } = await dialog.showMessageBox(mainWindow, {
+            type: 'info',
+            title: 'Aggiornamento pronto',
+            message: `Aggiornamento v${info.version} scaricato`,
+            detail: 'L\'applicazione si riavvierà per completare l\'aggiornamento.',
+            buttons: ['Installa e riavvia', 'Dopo'],
+            defaultId: 0,
+            cancelId: 1
+        });
+
+        if (response === 0) {
+            autoUpdater.quitAndInstall(false, true);
+        }
     });
 
     autoUpdater.on('update-not-available', (info) => {
@@ -36,7 +62,16 @@ function initUpdater(win) {
 
     autoUpdater.on('error', (err) => {
         console.error('Errore auto-updater:', err.message);
-        send('update:error', { message: err.message });
+        if (mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.setProgressBar(-1);
+        }
+        dialog.showMessageBox(mainWindow, {
+            type: 'error',
+            title: 'Errore aggiornamento',
+            message: 'Impossibile scaricare l\'aggiornamento',
+            detail: err.message,
+            buttons: ['OK']
+        });
     });
 
     console.log('Auto-updater: controllo aggiornamenti...');
@@ -49,15 +84,4 @@ function initUpdater(win) {
     }, 30 * 60 * 1000);
 }
 
-function downloadUpdate() {
-    autoUpdater.downloadUpdate().catch((err) => {
-        console.error('Errore download update:', err.message);
-        send('update:error', { message: err.message });
-    });
-}
-
-function installUpdate() {
-    autoUpdater.quitAndInstall(false, true);
-}
-
-module.exports = { initUpdater, downloadUpdate, installUpdate };
+module.exports = { initUpdater };
