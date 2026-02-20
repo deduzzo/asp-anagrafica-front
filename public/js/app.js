@@ -248,7 +248,7 @@ function showLoading(show) {
 }
 
 // Versione nel footer
-fetch('/version').then(r => r.json()).then(d => {
+fetch((window.APP_BASE || '/') + 'version').then(r => r.json()).then(d => {
     const el = document.getElementById('appVersion');
     if (el && d.version) el.textContent = 'v' + d.version;
 }).catch(() => {});

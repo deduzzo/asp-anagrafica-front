@@ -40,7 +40,7 @@
     </script>
     <script src="js/login.js"></script>
     <script>
-        fetch('/version').then(r=>r.json()).then(d=>{
+        fetch(APP_BASE + 'version').then(r=>r.json()).then(d=>{
             const el=document.getElementById('appVersion');
             if(el&&d.version)el.textContent='v'+d.version;
         }).catch(()=>{});
