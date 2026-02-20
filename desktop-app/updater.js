@@ -104,8 +104,8 @@ h3{margin:0 0 12px;font-size:14px;font-weight:600}
 p{margin:0 0 14px;font-size:12px;color:#666}
 .bar{width:100%;height:5px;background:#ddd;border-radius:3px;overflow:hidden}
 .fill{height:100%;background:#1a56db;border-radius:3px;transition:width .3s;width:5%}
-.indeterminate .fill{width:30%;animation:slide 1.5s infinite ease-in-out}
-@keyframes slide{0%{transform:translateX(-100%)}100%{transform:translateX(400%)}}
+.indeterminate .fill{width:30%!important;animation:slide 1.2s infinite ease-in-out!important}
+@keyframes slide{0%{margin-left:0}50%{margin-left:70%}100%{margin-left:0}}
 </style></head><body>
 <h3 id="t">Aggiornamento in corso...</h3>
 <p id="s">Preparazione...</p>
@@ -123,8 +123,8 @@ function updateProgress(text, percent) {
         const fill = document.getElementById('fill');
         const bar = document.getElementById('bar');
         ${percent >= 0
-            ? `fill.style.width='${percent}%'; bar.classList.remove('indeterminate');`
-            : `bar.classList.add('indeterminate');`}
+            ? `fill.style.width='${percent}%'; fill.style.removeProperty('animation'); bar.classList.remove('indeterminate');`
+            : `fill.style.width=''; bar.classList.add('indeterminate');`}
     `).catch(() => {});
 }
 
