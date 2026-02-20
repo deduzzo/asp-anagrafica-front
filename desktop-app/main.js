@@ -59,6 +59,9 @@ function startExpress() {
             }
         });
 
+        // Versione
+        expressApp.get('/version', (req, res) => res.json({ version: app.getVersion() }));
+
         // Serve file statici
         expressApp.use(express.static(getPublicPath()));
 

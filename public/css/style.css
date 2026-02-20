@@ -146,6 +146,14 @@ input:focus, select:focus {
 /* Main */
 .app-main { padding: 1.5rem; max-width: 1200px; margin: 0 auto; display: flex; flex-direction: column; gap: 1.5rem; }
 
+/* Footer */
+.app-footer {
+    text-align: center;
+    padding: 1rem;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
 /* Panels */
 .panel {
     background: var(--card-bg);

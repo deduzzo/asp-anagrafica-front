@@ -247,4 +247,10 @@ function showLoading(show) {
     document.getElementById('loadingOverlay').style.display = show ? 'flex' : 'none';
 }
 
+// Versione nel footer
+fetch('/version').then(r => r.json()).then(d => {
+    const el = document.getElementById('appVersion');
+    if (el && d.version) el.textContent = 'v' + d.version;
+}).catch(() => {});
+
 checkAuth();
