@@ -1,6 +1,6 @@
 {
   "name": "asp-anagrafica-front-desktop",
-  "version": "1.0.2",
+  "version": "1.0.0",
   "description": "ASP Messina - Anagrafica Assistiti Desktop",
   "author": "ASP Messina",
   "main": "main.js",
@@ -42,10 +42,7 @@
     ],
     "mac": {
       "category": "public.app-category.medical",
-      "target": ["dmg", "zip"],
-      "hardenedRuntime": true,
-      "entitlements": "build/entitlements.mac.plist",
-      "entitlementsInherit": "build/entitlements.mac.plist"
+      "target": ["dmg", "zip"]
     },
     "win": {
       "target": ["nsis", "portable"]
