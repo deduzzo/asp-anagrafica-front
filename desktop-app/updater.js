@@ -31,11 +31,16 @@ function initUpdater(win) {
         }
     });
 
+    autoUpdater.on('update-not-available', (info) => {
+        console.log('Nessun aggiornamento disponibile. Versione corrente:', info.version);
+    });
+
     autoUpdater.on('error', (err) => {
         console.error('Errore auto-updater:', err.message);
     });
 
     // Controlla subito
+    console.log('Auto-updater: controllo aggiornamenti...');
     autoUpdater.checkForUpdates().catch((err) => {
         console.log('Check update fallito (normale in dev):', err.message);
     });
