@@ -3,3 +3,5 @@ node_modules/
 .claude/
 package-lock.json
 *.log
+desktop-app/dist/
+desktop-app/node_modules/

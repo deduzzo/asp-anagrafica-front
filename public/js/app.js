@@ -142,6 +142,7 @@ function renderResults(body) {
 
 function showDetail(item) {
     window._selectedAssistito = item;
+    window.dispatchEvent(new CustomEvent('assistitoSelected', { detail: item }));
     const section = document.getElementById('detailSection');
     const isDeceased = !!item.dataDecesso;
     if (isDeceased) showAlert('Attenzione: paziente deceduto', 'warning', 5000);
