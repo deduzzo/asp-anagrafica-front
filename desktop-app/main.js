@@ -83,6 +83,13 @@ function createWindow() {
         }
     });
 
+    const appTitle = `Asp Messina Anagrafica - v.${app.getVersion()}`;
+
+    mainWindow.on('page-title-updated', (e) => {
+        e.preventDefault();
+        mainWindow.setTitle(appTitle);
+    });
+
     mainWindow.loadURL(`http://127.0.0.1:${EXPRESS_PORT}/`);
 
     mainWindow.on('closed', () => {
