@@ -75,7 +75,7 @@ function createWindow() {
         height: 800,
         minWidth: 800,
         minHeight: 600,
-        title: `ASP Anagrafica v${app.getVersion()}`,
+        title: `Asp Messina Anagrafica - v.${app.getVersion()}`,
         webPreferences: {
             preload: path.join(__dirname, 'preload.js'),
             contextIsolation: true,
