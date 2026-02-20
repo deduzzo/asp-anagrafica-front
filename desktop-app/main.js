@@ -4,7 +4,7 @@ const express = require('express');
 const https = require('https');
 const http = require('http');
 const { createWsServer, broadcastCommand, getClientCount, shutdown: shutdownWs } = require('./wsServer');
-const { initUpdater, installUpdate } = require('./updater');
+const { initUpdater, downloadUpdate, installUpdate } = require('./updater');
 
 const EXPRESS_PORT = 13080;
 const UPSTREAM = 'https://ws1.asp.messina.it';
@@ -75,7 +75,7 @@ function createWindow() {
         height: 800,
         minWidth: 800,
         minHeight: 600,
-        title: 'ASP Anagrafica',
+        title: `ASP Anagrafica v${app.getVersion()}`,
         webPreferences: {
             preload: path.join(__dirname, 'preload.js'),
             contextIsolation: true,
@@ -101,6 +101,10 @@ function registerIpcHandlers() {
 
     ipcMain.handle('ws:get-client-count', () => {
         return getClientCount();
+    });
+
+    ipcMain.handle('update:download', () => {
+        downloadUpdate();
     });
 
     ipcMain.handle('update:install', () => {

@@ -1,6 +1,6 @@
 {
   "name": "asp-anagrafica-front-desktop",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "ASP Messina - Anagrafica Assistiti Desktop",
   "author": "ASP Messina",
   "main": "main.js",
@@ -22,6 +22,7 @@
   "build": {
     "appId": "it.messina.asp.anagrafica",
     "productName": "ASP Anagrafica",
+    "artifactName": "ASP-Anagrafica-${version}-${arch}.${ext}",
     "directories": {
       "output": "dist"
     },

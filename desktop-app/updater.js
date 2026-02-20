@@ -2,33 +2,32 @@ const { autoUpdater } = require('electron-updater');
 
 let mainWindow = null;
 
+function send(channel, data) {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send(channel, data);
+    }
+}
+
 function initUpdater(win) {
     mainWindow = win;
 
-    autoUpdater.autoDownload = true;
+    autoUpdater.autoDownload = false;
     autoUpdater.autoInstallOnAppQuit = true;
 
     autoUpdater.on('update-available', (info) => {
         console.log('Update disponibile:', info.version);
-        if (mainWindow && !mainWindow.isDestroyed()) {
-            mainWindow.webContents.send('update:available', {
-                version: info.version,
-                releaseDate: info.releaseDate
-            });
-        }
+        send('update:available', { version: info.version, releaseDate: info.releaseDate });
     });
 
     autoUpdater.on('download-progress', (progress) => {
-        console.log(`Download: ${Math.round(progress.percent)}%`);
+        const pct = Math.round(progress.percent);
+        console.log(`Download: ${pct}%`);
+        send('update:download-progress', { percent: pct });
     });
 
     autoUpdater.on('update-downloaded', (info) => {
         console.log('Update scaricato:', info.version);
-        if (mainWindow && !mainWindow.isDestroyed()) {
-            mainWindow.webContents.send('update:downloaded', {
-                version: info.version
-            });
-        }
+        send('update:downloaded', { version: info.version });
     });
 
     autoUpdater.on('update-not-available', (info) => {
@@ -37,22 +36,28 @@ function initUpdater(win) {
 
     autoUpdater.on('error', (err) => {
         console.error('Errore auto-updater:', err.message);
+        send('update:error', { message: err.message });
     });
 
-    // Controlla subito
     console.log('Auto-updater: controllo aggiornamenti...');
     autoUpdater.checkForUpdates().catch((err) => {
         console.log('Check update fallito (normale in dev):', err.message);
     });
 
-    // Controlla ogni 30 minuti
     setInterval(() => {
         autoUpdater.checkForUpdates().catch(() => {});
     }, 30 * 60 * 1000);
+}
+
+function downloadUpdate() {
+    autoUpdater.downloadUpdate().catch((err) => {
+        console.error('Errore download update:', err.message);
+        send('update:error', { message: err.message });
+    });
 }
 
 function installUpdate() {
     autoUpdater.quitAndInstall(false, true);
 }
 
-module.exports = { initUpdater, installUpdate };
+module.exports = { initUpdater, downloadUpdate, installUpdate };

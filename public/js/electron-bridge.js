@@ -101,18 +101,60 @@ if (!window.electronAPI) {
         });
 
         // --- Auto-update notifications ---
+        function removeUpdateBanner() {
+            const old = document.getElementById('updateBanner');
+            if (old) old.remove();
+        }
+
         api.onUpdateAvailable((info) => {
-            showAlert(`Aggiornamento disponibile: v${info.version}`, 'info', 5000);
+            removeUpdateBanner();
+            const container = document.getElementById('alertContainer');
+            const banner = document.createElement('div');
+            banner.id = 'updateBanner';
+            banner.className = 'update-banner';
+            banner.innerHTML = `
+                <span class="update-banner-text">Nuova versione disponibile: <strong>v${info.version}</strong></span>
+                <button class="btn btn-small btn-primary" id="downloadUpdateBtn">Scarica</button>
+                <button class="btn btn-small btn-outline update-dismiss">&times;</button>`;
+            container.appendChild(banner);
+
+            banner.querySelector('#downloadUpdateBtn').addEventListener('click', () => {
+                banner.querySelector('#downloadUpdateBtn').disabled = true;
+                banner.querySelector('#downloadUpdateBtn').textContent = 'Download...';
+                // Aggiungi barra progresso
+                let progressBar = banner.querySelector('.update-progress');
+                if (!progressBar) {
+                    progressBar = document.createElement('div');
+                    progressBar.className = 'update-progress';
+                    progressBar.innerHTML = '<div class="update-progress-bar" style="width:0%"></div>';
+                    banner.querySelector('.update-banner-text').after(progressBar);
+                }
+                api.downloadUpdate();
+            });
+            banner.querySelector('.update-dismiss').addEventListener('click', () => {
+                banner.remove();
+            });
+        });
+
+        api.onUpdateDownloadProgress((info) => {
+            const bar = document.querySelector('.update-progress-bar');
+            if (bar) {
+                bar.style.width = info.percent + '%';
+            }
+            const btn = document.getElementById('downloadUpdateBtn');
+            if (btn) btn.textContent = `${info.percent}%`;
         });
 
         api.onUpdateDownloaded((info) => {
+            removeUpdateBanner();
             const container = document.getElementById('alertContainer');
             const banner = document.createElement('div');
-            banner.className = 'update-banner';
+            banner.id = 'updateBanner';
+            banner.className = 'update-banner update-banner-ready';
             banner.innerHTML = `
-                <span>Aggiornamento v${info.version} pronto.</span>
+                <span class="update-banner-text">Aggiornamento <strong>v${info.version}</strong> pronto!</span>
                 <button class="btn btn-small btn-primary" id="installUpdateBtn">Installa e riavvia</button>
-                <button class="btn btn-small btn-outline update-dismiss">&times;</button>`;
+                <button class="btn btn-small btn-outline update-dismiss">Dopo</button>`;
             container.appendChild(banner);
 
             banner.querySelector('#installUpdateBtn').addEventListener('click', () => {
@@ -121,6 +163,15 @@ if (!window.electronAPI) {
             banner.querySelector('.update-dismiss').addEventListener('click', () => {
                 banner.remove();
             });
+        });
+
+        api.onUpdateError((info) => {
+            const btn = document.getElementById('downloadUpdateBtn');
+            if (btn) {
+                btn.textContent = 'Riprova';
+                btn.disabled = false;
+            }
+            showAlert('Errore aggiornamento: ' + info.message, 'error', 5000);
         });
 
         // --- Comandi in arrivo da client esterni ---
