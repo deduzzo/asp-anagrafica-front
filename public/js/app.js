@@ -1,6 +1,7 @@
 // State
 window._selectedAssistito = null;
 let currentSearchType = 'cf';
+let _leafletMap = null;
 
 function getToken() { return sessionStorage.getItem('asp_token'); }
 
@@ -131,7 +132,11 @@ function renderResults(body) {
             <td>${formatDate(item.dataNascita)}</td>
             <td>${item.comuneResidenza || ''}</td>
             <td>${isDeceased ? '<span class="badge badge-danger">Deceduto</span>' : '<span class="badge badge-success">In vita</span>'}</td>`;
-        tr.addEventListener('click', () => showDetail(item));
+        tr.addEventListener('click', () => {
+            tbody.querySelectorAll('tr').forEach(r => r.classList.remove('row-selected'));
+            tr.classList.add('row-selected');
+            showDetail(item);
+        });
         tbody.appendChild(tr);
     });
 
@@ -191,18 +196,17 @@ function showDetail(item) {
 
     // Mappa OpenStreetMap
     const mapSection = document.getElementById('detailMapSection');
-    const mapContainer = document.getElementById('detailMap');
+    if (_leafletMap) { _leafletMap.remove(); _leafletMap = null; }
     if (item.lat && item.long) {
         mapSection.style.display = '';
-        mapContainer.innerHTML = '';
-        const map = L.map('detailMap').setView([item.lat, item.long], 16);
+        _leafletMap = L.map('detailMap').setView([item.lat, item.long], 16);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '&copy; OpenStreetMap contributors'
-        }).addTo(map);
-        L.marker([item.lat, item.long]).addTo(map)
+        }).addTo(_leafletMap);
+        L.marker([item.lat, item.long]).addTo(_leafletMap)
             .bindPopup(item.indirizzoResidenza || 'Posizione')
             .openPopup();
-        setTimeout(() => map.invalidateSize(), 200);
+        setTimeout(() => _leafletMap && _leafletMap.invalidateSize(), 200);
     } else {
         mapSection.style.display = 'none';
     }
