@@ -104,5 +104,40 @@ if (!window.electronAPI) {
         api.onWsIncomingCommand((msg) => {
             console.log('WS comando ricevuto:', msg);
         });
+
+        // --- Overlay modale aggiornamento ---
+        api.onUpdateStart((info) => {
+            let overlay = document.getElementById('updateOverlay');
+            if (!overlay) {
+                overlay = document.createElement('div');
+                overlay.id = 'updateOverlay';
+                overlay.className = 'update-overlay';
+                overlay.innerHTML = `
+                    <div class="update-modal">
+                        <div class="update-modal-icon">
+                            <div class="spinner"></div>
+                        </div>
+                        <h2 id="updateTitle">Aggiornamento in corso</h2>
+                        <p id="updateText">Preparazione...</p>
+                        <div class="update-modal-bar">
+                            <div class="update-modal-bar-fill" id="updateBarFill"></div>
+                        </div>
+                        <p class="update-modal-version">v${info.version}</p>
+                    </div>`;
+                document.body.appendChild(overlay);
+            }
+        });
+
+        api.onUpdateProgress((info) => {
+            const text = document.getElementById('updateText');
+            const bar = document.getElementById('updateBarFill');
+            if (text) text.textContent = info.text;
+            if (bar) bar.style.width = info.percent + '%';
+        });
+
+        api.onUpdateError((info) => {
+            const overlay = document.getElementById('updateOverlay');
+            if (overlay) overlay.remove();
+        });
     })();
 }
