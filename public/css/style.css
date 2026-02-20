@@ -154,6 +154,13 @@ input:focus, select:focus {
     color: var(--text-muted);
 }
 
+.login-body .app-footer {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+}
+
 /* Panels */
 .panel {
     background: var(--card-bg);
